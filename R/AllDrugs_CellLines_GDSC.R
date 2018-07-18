@@ -1,0 +1,18 @@
+#' GDSC data including 1075 CellLines and 265 drugs
+#'
+#' A dataset containing the raw data downloaded from GDSC archives (Release 6.0) \url{https://www.cancerrxgene.org/downloads}
+#' and Drug names mapped based on Drug IDs.For more information about the data, refer \url{https://www.ncbi.nlm.nih.gov/pubmed/27180993}
+#'
+#' @format A data frame with 225480 rows and 93 variables:
+#' \describe{
+#'   \item{CellLine}{Name of the cell line}
+#'   \item{Drug}{Name of the drug, can be also Drug ID.}
+#'   \item{MAX_CONC}{ Maximum drug concentration}
+#'   \item{FOLD_DILUTION}{9-fold or 5-fold dilutions used to calculate the concentrations at which the drug responses are measured}
+#'   \item{raw_max}{Fluorescent intensity at maximum drug concentration }
+#'   \item{raw2,....raw9}{Fluorescent instensities at all drug concentrations computed from fold dilutions}
+#'   \item{control1...control48}{Negative control - Seeded wells without treatment}
+#'   \item{blank1...blank32}{Positive control - Wells with just the blank solution (No cell lines and no drugs)}
+#'   }
+#' @source \url{https://www.cancerrxgene.org/downloads}
+"AllDrugs_CellLines_GDSC"

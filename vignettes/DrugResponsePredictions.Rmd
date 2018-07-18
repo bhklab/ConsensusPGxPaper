@@ -1,0 +1,42 @@
+---
+title: "DrugResponsePredictions"
+author: 
+- "Vigneshwari Subramanian"
+-  "Attila Gabor"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+collapse = TRUE,
+comment = "#>"
+)
+```
+
+Generate drug response prediction models using cell line (Mutation / CNV) and Drug features (ECFP4 descriptors)
+The function used here is meant for LNIC50 predictions. If some other metric (GR50, AUC, GRAOC) is used, it should be changed accordingly in the function.
+
+For practical reasons, Model building and predictions are not done locally and therefore, the results are not shown in R markdown.
+
+
+```{r warnings=FALSE, suppressMessages=TRUE}
+#Load packages
+if(!(require(c("caret","Metrics","AUC","car","proxy")))) {install.packages(c("caret","Metrics","AUC","car","proxy","doMC","randomForest"))}
+p<-c("caret","Metrics","AUC","car","proxy","doMC","randomForest")
+lapply(p,require,character.only=TRUE)
+```
+
+Load data and generate drug response prediction models
+
+```{r}
+data("LigandDesc_LNIC50")
+data("MutCNV")
+DrugResponse_pred <- DrugResponsePredictions_Ml_models(LigandDesc_LNIC50,MutCNV )
+```
+

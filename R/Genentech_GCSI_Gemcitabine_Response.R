@@ -1,0 +1,15 @@
+#' Genentech_GCSI_Gemcitabine_Response
+#'
+#' A dataset containing the Gemcitabine doses and median viabilities of all cell lines
+#'
+#' @format A data frame with 429 rows and 22 variables:
+#' \describe{
+#'   \item{Drug}{Name of the drug}
+#'   \item{CellLine}{Name of the CellLine}
+#'   \item{gCSI.IC50}{IC50 values computed from median raw viabilities}
+#'   \item{gCSI.Mean.Viability}{Mean viabilities across all concentrations}
+#'   \item{Dose.1....Dose.9}{Gemcitabine concentrations}
+#'   \item{Median.Raw.Viability.1....Median.Raw.Viability.9}{Raw viabilities of Gemcitabine at different concentrations}
+#'   }
+#' @source \url{https://www.nature.com/articles/nature17987#supplementary-information}
+"Genentech_GCSI_Gemcitabine_Response"
