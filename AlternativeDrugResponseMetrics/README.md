@@ -17,4 +17,4 @@ Analysis folder includes 3 Rmd files.
 
 
 ### Figures in report
-Please check Figures.html in the Analysis subfolder of this repository.
+Please check Figures.html in the ADRM_Analysis folder.
