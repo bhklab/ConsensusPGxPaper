@@ -1,21 +1,26 @@
 ---
 title: "Generation of figures in report"
-author: 
-- "Vigneshwari Subramanian"
-- "Attila Gabor"
-date: "`r Sys.Date()`"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Vignette Title}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+author:
+- Vigneshwari Subramanian
+- Attila Gabor
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    dev: png
+vignette: |
+  %\VignetteIndexEntry{Vignette Title} %\VignetteEngine{knitr::rmarkdown} %\VignetteEncoding{UTF-8}
 ---
   
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
-collapse = TRUE,
-comment = "#>"
+  collapse = TRUE,
+  comment = "#>",
+  tidy.opts=list(width.cutoff=50),
+  tidy=TRUE
 )
+
 ```
 
 Reproducibility of conventional and GR metrics across studies (Figure 1)
@@ -37,7 +42,7 @@ CTRP_GDSC_merged<-merge(CTRP_Conventional_GRMetrics_published,GDSC_DrugNames_IDs
 ```
 
 GCSI and GDSC reproducibility plots
-```{r, warning=FALSE, fig.width=7, fig.height=7}
+```{r, warning=FALSE,fig.width=7, fig.height=7}
 library("ggplot2")
 
 #Calculate drug-wise AUC and AOC correlations for GCSI / GDSC data and plot Drug specific AUCs and AOCs
@@ -46,28 +51,29 @@ AllGDSCDrugs_GCSI_AUC_AOC<-c()
 
 for(i in 1:length(Unique_GCSI_drugs_list))
 {
-GCSI_drug_extract<-GCSI_GDSC_merged[GCSI_GDSC_merged$Drug==Unique_GCSI_drugs_list[i],c("CellLine","GCSI_AUC","GCSI_GR_AOC","AUC","GRAOC")]
+GCSI_drug_extract<-GCSI_GDSC_merged[ GCSI_GDSC_merged$Drug==Unique_GCSI_drugs_list[ i ],c("CellLine","GCSI_AUC","GCSI_GR_AOC","AUC","GRAOC") ]
 
 #For those drugs with multiple measurements for the same cell lines, use their average values
 GCSI_drug_extract_averaged<-with(GCSI_drug_extract,aggregate(GCSI_drug_extract,by=list(CellLine=CellLine),mean))
 
 #Consider only those cell lines that have atleast 5 cell lines with GRAOCs >0.5 as it makes more sense to compare those cell lines that are responders
-GCSI_drug_extract_filtered<-GCSI_drug_extract_averaged[GCSI_drug_extract_averaged$GRAOC>0.5 & GCSI_drug_extract_averaged$GCSI_GR_AOC>0.5 ,]
+GCSI_drug_extract_filtered<-                                                              GCSI_drug_extract_averaged [ GCSI_drug_extract_averaged$GRAOC > 0.5 & 
+                               GCSI_drug_extract_averaged$GCSI_GR_AOC>0.5 , ]
 
 
 if(nrow(GCSI_drug_extract_filtered)>=5)
 {
 GCSI_GDSC_Drug_AUC_corr<-cor(GCSI_drug_extract_averaged$GCSI_AUC,GCSI_drug_extract_averaged$AUC,method="spearman")
 GCSI_GDSC_Drug_AOC_corr<-cor(GCSI_drug_extract_averaged$GCSI_GR_AOC,GCSI_drug_extract_averaged$GRAOC,method="spearman")   
-Drugs_AUC_AOC<-cbind.data.frame(Unique_GCSI_drugs_list[i],GCSI_GDSC_Drug_AUC_corr,GCSI_GDSC_Drug_AOC_corr)
+Drugs_AUC_AOC<-cbind.data.frame(Unique_GCSI_drugs_list[ i ],GCSI_GDSC_Drug_AUC_corr,GCSI_GDSC_Drug_AOC_corr)
 AllGDSCDrugs_GCSI_AUC_AOC<-rbind.data.frame(AllGDSCDrugs_GCSI_AUC_AOC,Drugs_AUC_AOC)
 }
 }
 colnames(AllGDSCDrugs_GCSI_AUC_AOC)=c("Drug","AUC","AOC")
 
 #Compute mean differences in correlations and do a paired t-test to assess the significance of correlations after excluding the reference drug "Gemcitabine"
-AllGDSCDrugs_GCSI_AUC_AOC_excludeRef<-AllGDSCDrugs_GCSI_AUC_AOC[!(AllGDSCDrugs_GCSI_AUC_AOC$Drug=="Gemcitabine"),]
-AllGDSCDrugs_GCSI_AUC_AOC_Gemcitabine<-AllGDSCDrugs_GCSI_AUC_AOC[(AllGDSCDrugs_GCSI_AUC_AOC$Drug=="Gemcitabine"),]
+AllGDSCDrugs_GCSI_AUC_AOC_excludeRef <-                                                   AllGDSCDrugs_GCSI_AUC_AOC[ !(AllGDSCDrugs_GCSI_AUC_AOC$Drug=="Gemcitabine"), ]
+AllGDSCDrugs_GCSI_AUC_AOC_Gemcitabine <-                                                  AllGDSCDrugs_GCSI_AUC_AOC[ (AllGDSCDrugs_GCSI_AUC_AOC$Drug=="Gemcitabine"), ]
 GCSI_tTest<-(t.test(AllGDSCDrugs_GCSI_AUC_AOC_excludeRef$AUC,AllGDSCDrugs_GCSI_AUC_AOC_excludeRef$AOC,var.equal=TRUE,paired=TRUE))$p.value
 
 Mean_correlation_diff<-mean(as.vector(AllGDSCDrugs_GCSI_AUC_AOC_excludeRef$AOC)-as.vector(AllGDSCDrugs_GCSI_AUC_AOC_excludeRef$AUC))
@@ -76,12 +82,24 @@ Mean_correlation_diff<-mean(as.vector(AllGDSCDrugs_GCSI_AUC_AOC_excludeRef$AOC)-
 #Generate correlation plots
 #jpeg(filename="GCSI_GDSC_AUC_AOC_correlation_plots.jpeg")
 par(cex=1,mar=c(4,4,2,1),cex.lab=1,cex=1.5,font=2)
-ggplot(AllGDSCDrugs_GCSI_AUC_AOC_excludeRef,aes(x=AUC,y=AOC))+geom_point(color="slategray")+geom_point(data=AllGDSCDrugs_GCSI_AUC_AOC_Gemcitabine,color="red")+geom_abline()+xlim(0,1)+ylim(0,1)+xlab("Spearmann's Corr for AUC")+ylab("Spearmann's Corr for GRAOC")+ggtitle("GCSI vs GDSC")+annotate(geom="text",label=paste("Improvement with GR=",round(Mean_correlation_diff,digits=2),sep=""),x=0.75,y=0.1,color="black",size=5)+annotate(geom="text",label=paste("p-value=",GCSI_tTest,sep=""),x=0.75,y=0,color="black",size=5)+theme_bw()+theme(plot.title = element_text(color="black",size=16,face="bold",hjust=0.5))+theme(axis.title = element_text(color="black",size=14,face="bold"))+theme(axis.text = element_text(color="black",size=12))
+ggplot(AllGDSCDrugs_GCSI_AUC_AOC_excludeRef,aes(x=AUC,y=AOC))+
+  geom_point(color="slategray")+ 
+  geom_point(data=AllGDSCDrugs_GCSI_AUC_AOC_Gemcitabine,color="red")+
+  geom_abline()+xlim(0,1)+ylim(0,1)+
+  xlab("Spearmann's Corr for AUC")+
+  ylab("Spearmann's Corr for GRAOC")+
+  ggtitle("GCSI vs GDSC")+ 
+  annotate(geom="text",label=paste("Improvement with GR=", round(Mean_correlation_diff,digits=2),sep=""),x=0.75,y=0.1,color="black",size=5)+
+  annotate(geom="text",label=paste("p-value=",GCSI_tTest,sep=""),x=0.75,y=0,color="black",size=5)+ 
+  theme_bw()+ 
+  theme(plot.title = element_text(color="black",size=16,face="bold",hjust=0.5))+ 
+  theme(axis.title = element_text(color="black",size=14,face="bold"))+ 
+  theme(axis.text = element_text(color="black",size=12))
 #dev.off()
 ```
 
 CTRP and GDSC reproducibility plots
-```{r, , warning=FALSE, fig.width=7, fig.height=7}
+```{r,warning=FALSE, fig.width=7, fig.height=7}
 library("ggplot2")
 
 #Calculate drug-wise AUC and AOC correlations for CTRP / GDSC data and plot Drug specific AUCs and AOCs
@@ -90,28 +108,28 @@ AllGDSCDrugs_CTRP_AUC_AOC<-c()
 
 for(i in 1:length(Unique_CTRP_drugs_list))
 {
-CTRP_drug_extract<-CTRP_GDSC_merged[CTRP_GDSC_merged$Drug==Unique_CTRP_drugs_list[i],]
+CTRP_drug_extract<-CTRP_GDSC_merged[ CTRP_GDSC_merged$Drug==Unique_CTRP_drugs_list[ i ], ]
 
 #For those drugs with multiple measurements for the same cell lines, use their average values
 CTRP_drug_extract_averaged<-with(CTRP_drug_extract,aggregate(CTRP_drug_extract,by=list(CellLine=CellLine),mean))
 
 #Pick up only those cell lines that have GRAOCs >0.5 as it makes more sense to compare those cell lines that are responders
-CTRP_drug_extract_filtered<-CTRP_drug_extract_averaged[CTRP_drug_extract_averaged$GRAOC>0.5 & CTRP_drug_extract_averaged$CTRP_GR_AOC>0.5 ,]
+CTRP_drug_extract_filtered <-                                                            CTRP_drug_extract_averaged[ CTRP_drug_extract_averaged$GRAOC > 0.5 & CTRP_drug_extract_averaged$CTRP_GR_AOC>0.5, ]
 
 #Make sure that there are atleast 5 cell lines that respond to the drug
 if(nrow(CTRP_drug_extract_filtered)>=5)
 {
 CTRP_GDSC_Drug_AUC_corr<-cor(CTRP_drug_extract_averaged$CTRP_area_under_curve,CTRP_drug_extract_averaged$AUC,method="spearman")
 CTRP_GDSC_Drug_AOC_corr<-cor(CTRP_drug_extract_averaged$CTRP_GR_AOC,CTRP_drug_extract_averaged$GRAOC,method="spearman")   
-Drugs_AUC_AOC<-cbind.data.frame(Unique_CTRP_drugs_list[i],CTRP_GDSC_Drug_AUC_corr,CTRP_GDSC_Drug_AOC_corr)
+Drugs_AUC_AOC<-cbind.data.frame(Unique_CTRP_drugs_list[ i ],CTRP_GDSC_Drug_AUC_corr,CTRP_GDSC_Drug_AOC_corr)
 AllGDSCDrugs_CTRP_AUC_AOC<-rbind.data.frame(AllGDSCDrugs_CTRP_AUC_AOC,Drugs_AUC_AOC)
 }
 }
 colnames(AllGDSCDrugs_CTRP_AUC_AOC)=c("Drug","AUC","AOC")
 
 #Compute mean differences in correlations and do a paired t-test to assess the significance of correlations after excluding the reference drug "Gemcitabine"
-AllGDSCDrugs_CTRP_AUC_AOC_excludeRef<-AllGDSCDrugs_CTRP_AUC_AOC[!(AllGDSCDrugs_CTRP_AUC_AOC$Drug=="Gemcitabine"),]
-AllGDSCDrugs_CTRP_AUC_AOC_Gemcitabine<-AllGDSCDrugs_CTRP_AUC_AOC[(AllGDSCDrugs_CTRP_AUC_AOC$Drug=="Gemcitabine"),]
+AllGDSCDrugs_CTRP_AUC_AOC_excludeRef <-                                                 AllGDSCDrugs_CTRP_AUC_AOC[ !(AllGDSCDrugs_CTRP_AUC_AOC$Drug=="Gemcitabine"), ]
+AllGDSCDrugs_CTRP_AUC_AOC_Gemcitabine <-                                                 AllGDSCDrugs_CTRP_AUC_AOC[ (AllGDSCDrugs_CTRP_AUC_AOC$Drug=="Gemcitabine"), ]
 CTRP_tTest<-(t.test(AllGDSCDrugs_CTRP_AUC_AOC_excludeRef$AUC,AllGDSCDrugs_CTRP_AUC_AOC_excludeRef$AOC,var.equal=TRUE,paired=TRUE))$p.value
 
 Mean_correlation_diff<-mean(as.vector(AllGDSCDrugs_CTRP_AUC_AOC_excludeRef$AOC)-as.vector(AllGDSCDrugs_CTRP_AUC_AOC_excludeRef$AUC))
@@ -120,7 +138,17 @@ Mean_correlation_diff<-mean(as.vector(AllGDSCDrugs_CTRP_AUC_AOC_excludeRef$AOC)-
 #Generate correlation plots
 #jpeg(filename="CTRP_GDSC_AUC_AOC_correlation_plots.jpeg")
 par(cex=1,mar=c(4,4,2,1),cex.lab=1,cex=1.5,font=2)
-ggplot(AllGDSCDrugs_CTRP_AUC_AOC_excludeRef,aes(x=AUC,y=AOC))+geom_point(color="slategray")+geom_point(data=AllGDSCDrugs_CTRP_AUC_AOC_Gemcitabine,color="red")+geom_abline()+xlim(0,1)+ylim(0,1)+xlab("Spearmann's Corr for AUC")+ylab("Spearmann's Corr for GRAOC")+ggtitle("CTRP vs GDSC")+annotate(geom="text",label=paste("Improvement with GR=",round(Mean_correlation_diff,digits=2),sep=""),x=0.75,y=0.1,color="black",size=5)+annotate(geom="text",label=paste("p-value=",CTRP_tTest,sep=""),x=0.75,y=0,color="black",size=5)+theme_bw()+theme(plot.title = element_text(color="black",size=16,face="bold",hjust=0.5))+theme(axis.title = element_text(color="black",size=14,face="bold"))+theme(axis.text = element_text(color="black",size=12))
+ggplot(AllGDSCDrugs_CTRP_AUC_AOC_excludeRef,aes(x=AUC,y=AOC))+ 
+ geom_point(color="slategray")+ 
+ geom_point(data=AllGDSCDrugs_CTRP_AUC_AOC_Gemcitabine,color="red")+ 
+ geom_abline()+xlim(0,1)+ylim(0,1)+ 
+ xlab("Spearmann's Corr for AUC")+ ylab("Spearmann's Corr for GRAOC")+ 
+ ggtitle("CTRP vs GDSC")+
+ annotate(geom="text",label=paste("Improvement with GR=",round(Mean_correlation_diff,digits=2),sep=""),x=0.75,y=0.1,color="black",size=5)+ annotate(geom="text",label=paste("p-value=",CTRP_tTest,sep=""),x=0.75,y=0,color="black",size=5)+ 
+ theme_bw()+ 
+ theme(plot.title = element_text(color="black",size=16,face="bold",hjust=0.5))+ 
+ theme(axis.title = element_text(color="black",size=14,face="bold"))+ 
+ theme(axis.text = element_text(color="black",size=12))
 #dev.off()
 ```
 
@@ -139,7 +167,7 @@ The results of the ANOVA analysis is loaded here and the ploting is documented b
 Load data corresponding to different metrics and obtain the p-values. 
 ```{r}
 library(AlternativeDrugResponseMetrics)
-l <- grep("_GRset",data(package="AlternativeDrugResponseMetrics")$results[,"Item"],value = T)
+l <- grep("_GRset",data(package="AlternativeDrugResponseMetrics")$results[ ,"Item" ],value = T)
 
 pvalue_ranges<-seq(0,10,by=0.2)
 Pvalues_allMetrics<-data.frame(pvalue_ranges)
@@ -151,15 +179,15 @@ data(list=l,envir = allData)
 for(iMetric in ls(allData))
 {
 	#Extract the FDR from each of the ANOVA results file
-	Allgenes_pvalues <- allData[[iMetric]]
+	Allgenes_pvalues <- allData[ [ iMetric ] ]
 	Allgenes_pvalues_corrected<-as.data.frame(sapply(Allgenes_pvalues$ANOVA_FEATURE_FDR, function(x) -log10(x/100)))
-	p_adjusted_values_allgenes<-Allgenes_pvalues_corrected[,1]
+	p_adjusted_values_allgenes<-Allgenes_pvalues_corrected[ ,1 ]
 	Allpvalues_allGenes<-c()
 	
 	for(j in 1:length(pvalue_ranges))
 	{
 		#Extract the number of drug gene associations for the different p value ranges
-		Adjustedvalues_WithinRange_allGenes <- length( subset( p_adjusted_values_allgenes, p_adjusted_values_allgenes > pvalue_ranges[j] ))
+		Adjustedvalues_WithinRange_allGenes <- length( subset( p_adjusted_values_allgenes, p_adjusted_values_allgenes > pvalue_ranges[ j ] ))
 		Allpvalues_allGenes <- c(Allpvalues_allGenes, log10(Adjustedvalues_WithinRange_allGenes))
 	}
 	Pvalues_allMetrics <- cbind.data.frame(Pvalues_allMetrics,as.data.frame(Allpvalues_allGenes))
@@ -186,7 +214,7 @@ points(Pvalues_allMetrics$pvalue_ranges,Pvalues_allMetrics$RecomputedLNIC50,col=
 points(Pvalues_allMetrics$pvalue_ranges,Pvalues_allMetrics$Emax,col="pink",pch=16,type='l',lty=1,lwd=3,xlim=c(0,5),ylim=c(0,5))
 points(Pvalues_allMetrics$pvalue_ranges,Pvalues_allMetrics$GRmax,col="magenta",pch=16,type='l',lty=1,lwd=3,xlim=c(0,5),ylim=c(0,5))
 abline (v=1,col="red",lty=4,lwd=3)
-legend(3.3,5,c(headers_Pvalues_allMetrics[1],headers_Pvalues_allMetrics[2],headers_Pvalues_allMetrics[3],headers_Pvalues_allMetrics[4],headers_Pvalues_allMetrics[5],headers_Pvalues_allMetrics[6],headers_Pvalues_allMetrics[7],headers_Pvalues_allMetrics[8]),lty=c(1,3,3,1,1,1,1,1),lwd=c(2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5),cex=0.5,col=c("pink","green","slategrey","red","magenta","blue","green","slategrey"))
+legend(3.3,5,c(headers_Pvalues_allMetrics[ 1 ],headers_Pvalues_allMetrics[ 2 ],headers_Pvalues_allMetrics[ 3 ],headers_Pvalues_allMetrics[ 4 ],headers_Pvalues_allMetrics[ 5 ],headers_Pvalues_allMetrics[ 6 ],headers_Pvalues_allMetrics[ 7 ],headers_Pvalues_allMetrics[ 8 ]),lty=c(1,3,3,1,1,1,1,1),lwd=c(2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5),cex=0.5,col=c("pink","green","slategrey","red","magenta","blue","green","slategrey"))
 #dev.off()
 ```
 
@@ -198,8 +226,8 @@ Function to make venn diagrams
 library("VennDiagram")
 Associations_overlap<-function(Metric1,Metric2,Metric_type,Fig_FileName,col_comb)
 {
-  Metric1_FDR<- Metric1[Metric1$ANOVA_FEATURE_FDR<10,]
-  Metric2_FDR<-Metric2[Metric2$ANOVA_FEATURE_FDR<10,]
+  Metric1_FDR<- Metric1[ Metric1$ANOVA_FEATURE_FDR<10, ]
+  Metric2_FDR<-Metric2[ Metric2$ANOVA_FEATURE_FDR<10, ]
   Metric1_Metric2_overlap<-merge(Metric1_FDR,Metric2_FDR,by=c("FEATURE","DRUG_NAME"))
   
   grid.newpage()
@@ -211,17 +239,17 @@ Associations_overlap<-function(Metric1,Metric2,Metric_type,Fig_FileName,col_comb
 ```
 
 Find the associations that overlap between AUC and GRAOC (Figure 4a)
-```{r,fig.width=7, fig.height=7}
+```{r,fig.width=5, fig.height=5}
 Associations_overlap(results_RecomputedAUC_GRset,results_GRAOC_GRset,c("AUC","GRAOC"),"AUC_GRAOC.jpeg",c("red","forest green"))
 ```
 
 Find the associations that overlap between IC50 and GR50 (Figure 4a)
-```{r,fig.width=7, fig.height=7}
+```{r,fig.width=5, fig.height=5}
 Associations_overlap(results_RecomputedLNIC50_GRset,results_LNGR50_GRset,c("IC50","GR50"),"IC50_GR50.jpeg",c("red","forest green"))
 ```
 
 Find the associations that overlap between Emax and GRmax (Figure 4a)
-```{r,fig.width=7, fig.height=7}
+```{r,fig.width=5, fig.height=5}
 Associations_overlap(results_Emax_GRset,results_GRmax_GRset,c("Emax","GRmax"),"Emax_GRmax.jpeg",c("red","forest green"))
 ```
 
@@ -230,8 +258,8 @@ Data that shows the overlaps at different association thresholds (Figure 4b)
 AUC_AOC_overlap<-Associations_overlap_percentages(results_RecomputedAUC_GRset,results_GRAOC_GRset,"AUC","GRAOC")
 IC50_GR50_overlap<-Associations_overlap_percentages(results_RecomputedLNIC50_GRset,results_LNGR50_GRset,"IC50","GR50")
 Emax_GRmax_overlap<-Associations_overlap_percentages(results_Emax_GRset,results_GRmax_GRset,"Emax","GRmax")
-Recomputed_GDSC_IC50_overlap<-Associations_overlap_percentages(results_RecomputedLNIC50_GRset,results_GDSC_LNIC50_GRset,"RecomputedIC50","GDSCIC50")
-Recomputed_GDSC_AUC_overlap<-Associations_overlap_percentages(results_RecomputedAUC_GRset,results_GDSC_AUC_GRset,"RecomputedAUC","GDSC_AUC")
+Recomputed_GDSC_IC50_overlap<-    Associations_overlap_percentages(results_RecomputedLNIC50_GRset,results_GDSC_LNIC50_GRset,"RecomputedIC50","GDSCIC50")
+Recomputed_GDSC_AUC_overlap<- Associations_overlap_percentages(results_RecomputedAUC_GRset,results_GDSC_AUC_GRset,"RecomputedAUC","GDSC_AUC")
 Random_overlap<-Random_coincidence(results_RecomputedAUC_GRset)
 
 #jpeg("Conventional_GR_Associations_Overlap.jpeg")
@@ -249,20 +277,13 @@ legend(300,100,c("AUC-GRAOC","IC50-GR50","Emax-GRmax","Recomputed-GDSC IC50","Re
 #dev.off()
 ```
 
-Histogram showing the distribution of random overlaps based on different association thresholds (Figure 4b)
-```{r,fig.width=7, fig.height=7}
-#jpeg("RandomOverlap_Dist.jpeg")
-hist(Random_overlap$overlap,xlab="Random overlap %",main="")
-#dev.off()
-```
-
 Find the associations that overlap between GDSC IC50 and Recomputed IC50 (Figure 16)
-```{r,fig.width=7, fig.height=7}
+```{r,fig.width=6, fig.height=6}
 Associations_overlap(results_RecomputedLNIC50_GRset,results_GDSC_LNIC50_GRset,c("Recomputed IC50","GDSC IC50"),"GDSC_RecomputedIC50.jpeg",c("skyblue","orange"))
 ```
 
 Find the associations that overlap between GDSC AUC and Recomputed AUC (Figure 16)
-```{r,fig.width=7, fig.height=7}
+```{r,fig.width=6, fig.height=6}
 Associations_overlap(results_RecomputedAUC_GRset,results_GDSC_AUC_GRset,c("Recomputed AUC","GDSC AUC"),"GDSC_RecomputedAUC.jpeg",c("skyblue","orange"))
 ```
 
@@ -274,11 +295,11 @@ FDR_comp<-function(metric1,metric2,Fig_FileName,label1,label2,main_heading,legen
 {
   #Merge the 2 metrics
   Diff_metrics_mergeFDRs<-merge(metric1, metric2, by=c("FEATURE","DRUG_NAME"))
-  Metric1_Metric2_FDR_assoc<-cbind.data.frame(Assoc=paste(Diff_metrics_mergeFDRs$DRUG_NAME,Diff_metrics_mergeFDRs$FEATURE,sep="-"),Metric1_FDR=as.vector(-log10(Diff_metrics_mergeFDRs$ANOVA_FEATURE_FDR.x/100)),Metric2_FDR=as.vector(-log10(Diff_metrics_mergeFDRs$ANOVA_FEATURE_FDR.y/100)))
+  Metric1_Metric2_FDR_assoc<-cbind.data.frame                                                              (Assoc = paste(Diff_metrics_mergeFDRs$DRUG_NAME, Diff_metrics_mergeFDRs$FEATURE, sep="-"), Metric1_FDR = as.vector(-log10(Diff_metrics_mergeFDRs$ANOVA_FEATURE_FDR.x/100)), Metric2_FDR = as.vector(-log10(Diff_metrics_mergeFDRs$ANOVA_FEATURE_FDR.y/100)))
   
   #Pick only those associations with FDR < 10%
-  Metric1_FDR_extract<- Metric1_Metric2_FDR_assoc[which(Metric1_Metric2_FDR_assoc$Metric1_FDR>1),]
-  Metric2_FDR_extract<- Metric1_Metric2_FDR_assoc[which(Metric1_Metric2_FDR_assoc$Metric2_FDR>1),]
+  Metric1_FDR_extract <-                                                                      Metric1_Metric2_FDR_assoc [ which(Metric1_Metric2_FDR_assoc$Metric1_FDR>1), ]
+  Metric2_FDR_extract <-                                                                  Metric1_Metric2_FDR_assoc [ which(Metric1_Metric2_FDR_assoc$Metric2_FDR>1), ]
   
   #jpeg(filename=Fig_FileName,quality=100)
   par(cex=1,mar=c(4,4,2,1),cex.lab=0.75,cex=1.5,font=2)
@@ -311,17 +332,17 @@ data("GDSC_KnownAssociations",package = "AlternativeDrugResponseMetrics")
 FDR_KnownAssoc<-function(metric1,metric2,Fig_FileName,label1,label2,main_heading,legend_labels,pos1,pos2)
 {
   Metric1_Metric2_FDR_merged<-merge(metric1, metric2, by=c("DRUG_NAME","FEATURE"))
-  Metric1_Metric2_FDR_merged_DrugFeature<-cbind.data.frame(Metric1_Metric2_FDR_merged,Ident_Drug_Feature=paste(as.vector(Metric1_Metric2_FDR_merged$DRUG_NAME),as.vector(Metric1_Metric2_FDR_merged$FEATURE),sep="-"))
- Metric1_Metric2_FDR_merged_assoc_extract<-Metric1_Metric2_FDR_merged_DrugFeature[grepl(paste(as.vector(GDSC_KnownAssociations$Ident_Drug_Feature),collapse="|"),as.vector(Metric1_Metric2_FDR_merged_DrugFeature$Ident_Drug_Feature)),]
+  Metric1_Metric2_FDR_merged_DrugFeature<-cbind.data.frame( Metric1_Metric2_FDR_merged,Ident_Drug_Feature=paste(as.vector(Metric1_Metric2_FDR_merged$DRUG_NAME), as.vector(Metric1_Metric2_FDR_merged$FEATURE),sep="-"))
+ Metric1_Metric2_FDR_merged_assoc_extract <-                                 Metric1_Metric2_FDR_merged_DrugFeature[    grepl(paste(as.vector(GDSC_KnownAssociations$Ident_Drug_Feature),collapse="|"), as.vector(Metric1_Metric2_FDR_merged_DrugFeature$Ident_Drug_Feature)), ]
 
-  Metric1_Metric2_FDR_assoc<-cbind.data.frame(Assoc=paste(Metric1_Metric2_FDR_merged$DRUG_NAME,Metric1_Metric2_FDR_merged$FEATURE,sep="-"),Metric1_FDR=as.vector(-log10(Metric1_Metric2_FDR_merged$ANOVA_FEATURE_FDR.x/100)),Metric2_FDR=as.vector(-log10(Metric1_Metric2_FDR_merged$ANOVA_FEATURE_FDR.y/100)))
-Metric1_FDR_extract<-Metric1_Metric2_FDR_assoc[which(Metric1_Metric2_FDR_assoc$Metric1_FDR>1),]
-Metric2_FDR_extract<-Metric1_Metric2_FDR_assoc[which(Metric1_Metric2_FDR_assoc$Metric2_FDR>1),]
+  Metric1_Metric2_FDR_assoc <-                                                                   cbind.data.frame( Assoc=paste(Metric1_Metric2_FDR_merged$DRUG_NAME, Metric1_Metric2_FDR_merged$FEATURE, sep="-"), Metric1_FDR=as.vector(-log10(Metric1_Metric2_FDR_merged$ANOVA_FEATURE_FDR.x/100)), Metric2_FDR=as.vector(-log10(Metric1_Metric2_FDR_merged$ANOVA_FEATURE_FDR.y/100)))
+Metric1_FDR_extract <-                                                                  Metric1_Metric2_FDR_assoc [ which(Metric1_Metric2_FDR_assoc$Metric1_FDR>1), ]
+Metric2_FDR_extract <-                                                                 Metric1_Metric2_FDR_assoc [ which(Metric1_Metric2_FDR_assoc$Metric2_FDR>1), ]
 
 #jpeg(filename=Fig_FileName,quality=100)
 par(cex=1,mar=c(4,4,2,1),cex.lab=0.75,cex=1.5,font=2)
 plot(Metric1_Metric2_FDR_assoc$Metric1_FDR,Metric1_Metric2_FDR_assoc$Metric2_FDR,xlab=label1,ylab=label2, main= main_heading,col="light gray",pch=16,cex.axis=1)
-points(as.vector(-log10(Metric1_Metric2_FDR_merged_assoc_extract$ANOVA_FEATURE_FDR.x/100)),as.vector(-log10(Metric1_Metric2_FDR_merged_assoc_extract$ANOVA_FEATURE_FDR.y/100)),col="orange",pch=16)
+points(                                                                                              as.vector(-log10 (Metric1_Metric2_FDR_merged_assoc_extract$ANOVA_FEATURE_FDR.x/100)), as.vector(-log10(Metric1_Metric2_FDR_merged_assoc_extract$ANOVA_FEATURE_FDR.y/100)),col="orange",pch=16)
 legend(pos1,pos2,legend_labels,pch=16,cex=0.5,col=c("light gray","orange"))
 #dev.off()
 }
@@ -363,24 +384,25 @@ Metric_type<-c("GDSC_AUC","GDSC_IC50","GR50","GRAOC","RecomputedAUC","Recomputed
 AllMetrics<-c()
 for(i in 1:length(Dist_Data))
 {
-  Metric_dist_all<-Dist_Data[[i]]
+  Metric_dist_all<-Dist_Data[ [ i ] ]
   
   #Remove those entries for which the distances between FDR and Original targets is infinite;Only definite distances considered
-  Metric_dist<- Metric_dist_all[-(which(Metric_dist_all$Path_length == "Inf")),]
+  Metric_dist<- Metric_dist_all[ -(which(Metric_dist_all$Path_length == "Inf")), ]
   
     #Group the distances
   Paths_ranges<-split(Metric_dist, cut(Metric_dist$Path_length, c(-1,0,1,2,3,4,5,6,7,8), include.lowest=TRUE))
-  Paths_ranges_no<-sapply(Paths_ranges,function(x) nrow(x[1:length(x)]))
+  Paths_ranges_no<-sapply(Paths_ranges,function(x) nrow(x[ 1:length(x) ]))
   Percentage_Paths_ranges_no<-sapply(Paths_ranges_no,function(x) (x/nrow(Metric_dist))*100)
   Paths_lengths<-c("0","1","2","3","4","5","6","7","8")
-  Metric_paths<-cbind.data.frame(Metric=Metric_type[i],Paths_lengths,Paths_ranges_no, Percentage_Paths_ranges_no)
+  Metric_paths<-cbind.data.frame(Metric=Metric_type[ i ],Paths_lengths,Paths_ranges_no, Percentage_Paths_ranges_no)
   AllMetrics<-rbind(AllMetrics,Metric_paths)
 }
 
-#jpeg(filename="DistanceToDrugTargets_AllMetrics_IC_GR_PercentageDistPlots_allTargets_FDR10.jpeg")
+#jpeg(filename="AllMetrics_IC_GR_PercentageDistPlots_allTargets_FDR10.jpeg")
 par(cex=1,mar=c(4,4,2,1),cex.lab=1,cex=1.5,font=2)
 ggplot( AllMetrics, aes(fill=Metric, y=Percentage_Paths_ranges_no, x=Paths_lengths)) + 
-  geom_bar(position="dodge", stat="identity")+xlab("Distance To Drug Target")+ylab("% of Drug gene pairs")
+  geom_bar(position="dodge", stat="identity")+
+  xlab("Distance To Drug Target")+ylab("% of Drug gene pairs")
 #dev.off()
 
 ```
@@ -395,24 +417,25 @@ Metric_type<-c("GDSC_AUC","GDSC_IC50","GR50","GRAOC","RecomputedAUC","Recomputed
 AllMetrics<-c()
 for(i in 1:length(Dist_Data))
 {
-  Metric_dist_all<-Dist_Data[[i]]
+  Metric_dist_all<-Dist_Data[ [ i ] ]
   
   #Remove those entries for which the distances between FDR and Original targets is infinite;      Only definite distances considered
-  Metric_dist<- Metric_dist_all[-(which(Metric_dist_all$Path_length == "Inf")),]
+  Metric_dist<- Metric_dist_all[ -(which(Metric_dist_all$Path_length == "Inf")), ]
   
     #Group the distances
   Paths_ranges<-split(Metric_dist, cut(Metric_dist$Path_length, c(-1,0), include.lowest=TRUE))
-  Paths_ranges_no<-sapply(Paths_ranges,function(x) nrow(x[1:length(x)]))
+  Paths_ranges_no<-sapply(Paths_ranges,function(x) nrow(x[ 1:length(x) ]))
   Percentage_Paths_ranges_no<-sapply(Paths_ranges_no,function(x) (x/nrow(Metric_dist))*100)
   Paths_lengths<-c("0")
-  Metric_paths<-cbind.data.frame(Metric=Metric_type[i],Paths_lengths,Paths_ranges_no, Percentage_Paths_ranges_no)
+  Metric_paths<-cbind.data.frame(Metric=Metric_type[ i ],Paths_lengths,Paths_ranges_no, Percentage_Paths_ranges_no)
   AllMetrics<-rbind(AllMetrics,Metric_paths)
 }
 
-#jpeg(filename="DistanceToDrugTargets_AllMetrics_IC_GR_PercentageDistPlots_actualTargets_FDR10.jpeg")
+#jpeg(filename="AllMetrics_IC_GR_PercentageDistPlots_actualTargets_FDR10.jpeg")
 par(cex=1,mar=c(4,4,2,1),cex.lab=1,cex=1.5,font=2)
 ggplot( AllMetrics, aes(fill=Metric, y=Percentage_Paths_ranges_no, x=Paths_lengths)) + 
-  geom_bar(position="dodge", stat="identity")+xlab("Distance To Drug Target")+ylab("% of Drug gene pairs")
+  geom_bar(position="dodge", stat="identity")+
+  xlab("Distance To Drug Target")+ylab("% of Drug gene pairs")
 #dev.off()
 ```
 
@@ -423,17 +446,17 @@ data("GDSC_DrugIDs_Names_mapped",package = "AlternativeDrugResponseMetrics")
 
 #Map the drug ids to drug names
 GDSC_DrugNames_IDs_merged<-merge(Conventional_GR_allCalculatedMetrics_merged,GDSC_DrugIDs_Names_mapped,by.x="Drug",by.y="DRUG_ID")
-colnames(GDSC_DrugNames_IDs_merged)[1]="ID"
-colnames(GDSC_DrugNames_IDs_merged)[19]="Drug"
+colnames(GDSC_DrugNames_IDs_merged)[ 1 ]="ID"
+colnames(GDSC_DrugNames_IDs_merged)[ 19 ]="Drug"
 Unique_GCSI_drugs_list<-unique(GDSC_DrugNames_IDs_merged$Drug)
 AllDrugs_IC50s_GR50<-c()
 for(i in 1:length(Unique_GCSI_drugs_list))
 {
-GCSI_drug_extract<-GDSC_DrugNames_IDs_merged[GDSC_DrugNames_IDs_merged$Drug==Unique_GCSI_drugs_list[i],c("CellLine","LN_GR50","LN_IC50","AUC","GRAOC")]
+GCSI_drug_extract<-GDSC_DrugNames_IDs_merged[ GDSC_DrugNames_IDs_merged$Drug==Unique_GCSI_drugs_list[ i ],c("CellLine","LN_GR50","LN_IC50","AUC","GRAOC") ]
 
 #Compute the averages of those drug-cell line pairs present multiple times
 GCSI_drug_extract_averaged<-with(GCSI_drug_extract,aggregate(GCSI_drug_extract,by=list(CellLine=CellLine),mean))
-Drugs_Activities_combined<-cbind.data.frame(Drug=Unique_GCSI_drugs_list[i],GCSI_drug_extract_averaged)
+Drugs_Activities_combined<-cbind.data.frame(Drug=Unique_GCSI_drugs_list[ i ],GCSI_drug_extract_averaged)
 }
 ```
 
@@ -459,14 +482,17 @@ Response_DivisionTimes_merged<-merge(Conventional_GR_allCalculatedMetrics_merged
 correlation_DivTimes=cor(Response_DivisionTimes_merged$LN_IC50,Response_DivisionTimes_merged$LN_GR50)
 #jpeg(filename="DoublingTime_IC50_GR50_ggplots_colored.jpeg")
 par(cex=1,mar=c(4,4,2,1),cex.lab=1,cex=1.5,font=2)
-ggplot(Response_DivisionTimes_merged,aes(x=LN_IC50,y=LN_GR50,color=Doubling_Time))+geom_point()+scale_color_gradient(low="green",high="red")+annotate(geom="text",label=paste("Pearson's correlation=",round(correlation_DivTimes,digits=4),sep=""),x=5,y=-15,color="black")
+ggplot(Response_DivisionTimes_merged,aes(x=LN_IC50,y=LN_GR50,color=Doubling_Time))+
+  geom_point()+
+  scale_color_gradient(low="green",high="red")+
+  annotate(geom="text",label=paste("Pearson's correlation=",round(correlation_DivTimes,digits=4),sep=""),x=5,y=-15,color="black")
 #dev.off()
 ```
 
 Load data corresponding to different metrics (IC, GR, NDR and PI) and obtain the p-values. 
 ```{r}
 library(AlternativeDrugResponseMetrics)
-l_NDRset <- grep("_NDRset",data(package="AlternativeDrugResponseMetrics")$results[,"Item"],value = T)
+l_NDRset <- grep("_NDRset",data(package="AlternativeDrugResponseMetrics")$results[ ,"Item" ],value = T)
 NDRset_Data = new.env()
 data(list=l_NDRset,envir = NDRset_Data)
 
@@ -476,15 +502,15 @@ Pvalues_allMetrics<-data.frame(pvalue_ranges)
 for(iMetric in ls(NDRset_Data))
 {
 	#Extract the FDR from each of the ANOVA results file
-	Allgenes_pvalues <- NDRset_Data[[iMetric]]
+	Allgenes_pvalues <- NDRset_Data[ [ iMetric ] ]
 	Allgenes_pvalues_corrected<-as.data.frame(sapply(Allgenes_pvalues$ANOVA_FEATURE_FDR, function(x) -log10(x/100)))
-	p_adjusted_values_allgenes<-Allgenes_pvalues_corrected[,1]
+	p_adjusted_values_allgenes<-Allgenes_pvalues_corrected[ ,1 ]
 	Allpvalues_allGenes<-c()
 	
 	for(j in 1:length(pvalue_ranges))
 	{
 		#Extract the number of drug gene associations for the different p value ranges
-		Adjustedvalues_WithinRange_allGenes <- length( subset( p_adjusted_values_allgenes, p_adjusted_values_allgenes > pvalue_ranges[j] ))
+		Adjustedvalues_WithinRange_allGenes <- length( subset( p_adjusted_values_allgenes, p_adjusted_values_allgenes > pvalue_ranges[ j ] ))
 		Allpvalues_allGenes <- c(Allpvalues_allGenes, log10(Adjustedvalues_WithinRange_allGenes))
 	}
 	Pvalues_allMetrics <- cbind.data.frame(Pvalues_allMetrics,as.data.frame(Allpvalues_allGenes))
@@ -512,7 +538,7 @@ points(Pvalues_allMetrics$pvalue_ranges,Pvalues_allMetrics$NDR50_NDRset,col="gre
 points(Pvalues_allMetrics$pvalue_ranges,Pvalues_allMetrics$PI50_NDRset,col="red",pch=16,type='l',lty=1,lwd=3,xlim=c(0,10),ylim=c(0,5))
 points(Pvalues_allMetrics$pvalue_ranges,Pvalues_allMetrics$GR50_NDRset,col="blue",pch=16,type='l',lty=1,lwd=3,xlim=c(0,10),ylim=c(0,5))
 abline (v=1,col="red",lty=4,lwd=3)
-legend(7,5,c(headers_Pvalues_allMetrics[1],headers_Pvalues_allMetrics[2],headers_Pvalues_allMetrics[3],headers_Pvalues_allMetrics[4],headers_Pvalues_allMetrics[5],headers_Pvalues_allMetrics[6],headers_Pvalues_allMetrics[7],headers_Pvalues_allMetrics[8]),lty=c(3,1,3,1,1,3,1,3),lwd=c(2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5),cex=0.5,col=c("slategrey","blue","blue","slategrey","green","green","red","red"))
+legend(7,5,c(headers_Pvalues_allMetrics[ 1 ],headers_Pvalues_allMetrics[ 2 ],headers_Pvalues_allMetrics[ 3 ],headers_Pvalues_allMetrics[ 4 ],headers_Pvalues_allMetrics[ 5 ],headers_Pvalues_allMetrics[ 6 ],headers_Pvalues_allMetrics[ 7 ],headers_Pvalues_allMetrics[ 8 ]),lty=c(3,1,3,1,1,3,1,3),lwd=c(2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5),cex=0.5,col=c("slategrey","blue","blue","slategrey","green","green","red","red"))
 #dev.off()
 ```
 
@@ -544,24 +570,25 @@ Metric_type<-c("AUC","GR50","GRAOC","IC50","NDR50","NDRAOC","PI50","PIAOC")
 AllMetrics<-c()
 for(i in 1:length(Dist_NDRset_Data))
 {
-  Metric_dist_all<-Dist_NDRset_Data[[i]]
+  Metric_dist_all<-Dist_NDRset_Data[ [ i ] ]
   
   #Remove those entries for which the distances between FDR and Original targets is infinite;      Only definite distances considered
-  Metric_dist<- Metric_dist_all[-(which(Metric_dist_all$Path_length == "Inf")),]
+  Metric_dist<- Metric_dist_all[ -(which(Metric_dist_all$Path_length == "Inf")), ]
   
     #Group the distances
   Paths_ranges<-split(Metric_dist, cut(Metric_dist$Path_length, c(-1,0,1,2,3,4,5,6,7,8), include.lowest=TRUE))
-  Paths_ranges_no<-sapply(Paths_ranges,function(x) nrow(x[1:length(x)]))
+  Paths_ranges_no<-sapply(Paths_ranges,function(x) nrow(x[ 1:length(x) ]))
   Percentage_Paths_ranges_no<-sapply(Paths_ranges_no,function(x) (x/nrow(Metric_dist))*100)
   Paths_lengths<-c("0","1","2","3","4","5","6","7","8")
-  Metric_paths<-cbind.data.frame(Metric=Metric_type[i],Paths_lengths,Paths_ranges_no, Percentage_Paths_ranges_no)
+  Metric_paths<-cbind.data.frame(Metric=Metric_type[ i ],Paths_lengths,Paths_ranges_no, Percentage_Paths_ranges_no)
   AllMetrics<-rbind(AllMetrics,Metric_paths)
 }
 
-#jpeg(filename="DistanceToDrugTargets_AllMetrics_IC_NDR_GR_PI_PercentageDistPlots_allTargets_FDR10.jpeg")
+#jpeg(filename="AllMetrics_IC_NDR_GR_PI_PercentageDistPlots_allTargets_FDR10.jpeg")
 par(cex=1,mar=c(4,4,2,1),cex.lab=1,cex=1.5,font=2)
 ggplot( AllMetrics, aes(fill=Metric, y=Percentage_Paths_ranges_no, x=Paths_lengths)) + 
-  geom_bar(position="dodge", stat="identity")+xlab("Distance To Drug Target")+ylab("% of Drug gene pairs")
+  geom_bar(position="dodge", stat="identity")+
+  xlab("Distance To Drug Target")+ylab("% of Drug gene pairs")
 #dev.off()
 
 ```
@@ -575,29 +602,30 @@ Metric_type<-c("AUC","GR50","GRAOC","IC50","NDR50","NDRAOC","PI50","PIAOC")
 AllMetrics<-c()
 for(i in 1:length(Dist_NDRset_Data))
 {
-  Metric_dist_all<-Dist_NDRset_Data[[i]]
+  Metric_dist_all<-Dist_NDRset_Data[ [ i ] ]
   
   #Remove those entries for which the distances between FDR and Original targets is infinite;      Only definite distances considered
-  Metric_dist<- Metric_dist_all[-(which(Metric_dist_all$Path_length == "Inf")),]
+  Metric_dist<- Metric_dist_all[ -(which(Metric_dist_all$Path_length == "Inf")), ]
   
     #Group the distances
   Paths_ranges<-split(Metric_dist, cut(Metric_dist$Path_length, c(-1,0), include.lowest=TRUE))
-  Paths_ranges_no<-sapply(Paths_ranges,function(x) nrow(x[1:length(x)]))
+  Paths_ranges_no<-sapply(Paths_ranges,function(x) nrow(x[ 1:length(x) ]))
   Percentage_Paths_ranges_no<-sapply(Paths_ranges_no,function(x) (x/nrow(Metric_dist))*100)
   Paths_lengths<-c("0")
-  Metric_paths<-cbind.data.frame(Metric=Metric_type[i],Paths_lengths,Paths_ranges_no, Percentage_Paths_ranges_no)
+  Metric_paths<-cbind.data.frame(Metric=Metric_type[ i ],Paths_lengths,Paths_ranges_no, Percentage_Paths_ranges_no)
   AllMetrics<-rbind(AllMetrics,Metric_paths)
 }
 
-#jpeg(filename="DistanceToDrugTargets_AllMetrics_IC_NDR_PI_GR_PercentageDistPlots_actualTargets_FDR10.jpeg")
+#jpeg(filename="AllMetrics_IC_NDR_PI_GR_PercentageDistPlots_actualTargets_FDR10.jpeg")
 par(cex=1,mar=c(4,4,2,1),cex.lab=1,cex=1.5,font=2)
 ggplot( AllMetrics, aes(fill=Metric, y=Percentage_Paths_ranges_no, x=Paths_lengths)) + 
-  geom_bar(position="dodge", stat="identity")+xlab("Distance To Drug Target")+ylab("% of Drug gene pairs")
+  geom_bar(position="dodge", stat="identity")+
+  xlab("Distance To Drug Target")+ylab("% of Drug gene pairs")
 #dev.off()
 ```
 Find the associations that overlap between IC50 and NDR50 (Figure 14)
 ```{r,fig.width=7, fig.height=7}
-l_NDRset <- grep("_NDRset",data(package="AlternativeDrugResponseMetrics")$results[,"Item"],value = T)
+l_NDRset <- grep("_NDRset",data(package="AlternativeDrugResponseMetrics")$results[ ,"Item" ],value = T)
 NDRset_Data = new.env()
 data(list=l_NDRset,envir = NDRset_Data)
 Associations_overlap(results_IC50_NDRset,results_NDR50_NDRset,c("IC50","NDR50"),"IC50_NDR50.jpeg",c("red","forest green"))
@@ -626,16 +654,22 @@ data("AllMetrics_merged_NDRdata",package = "AlternativeDrugResponseMetrics")
 Hafner_FIMM_GR_merged<-merge(Conventional_GR_allCalculatedMetrics_merged,AllMetrics_merged_NDRset,by=c("CellLine","Drug"))
 
 #Extract the GRmax values and group the GR50s based on strong (GRmax>1), moderate (0 > GRmax < 1) or weak responses (GRmax>1)
-Cytotoxic<-Hafner_FIMM_GR_merged[which(Hafner_FIMM_GR_merged$GRmax.x<0),]
-Cytostatic<-Hafner_FIMM_GR_merged[which(Hafner_FIMM_GR_merged$GRmax.x>=0 & Hafner_FIMM_GR_merged$GRmax.x<0.5),]
-GRmax_weak<-Hafner_FIMM_GR_merged[which(Hafner_FIMM_GR_merged$GRmax.x>=0.5),]
+Cytotoxic<-Hafner_FIMM_GR_merged[ which(Hafner_FIMM_GR_merged$GRmax.x<0), ]
+Cytostatic<-Hafner_FIMM_GR_merged[ which(Hafner_FIMM_GR_merged$GRmax.x>=0 & Hafner_FIMM_GR_merged$GRmax.x<0.5), ]
+GRmax_weak<-Hafner_FIMM_GR_merged[ which(Hafner_FIMM_GR_merged$GRmax.x>=0.5), ]
 
 #jpeg(filename="Hafner_FIMM_GR50_correlation_plots_ColoredByGRmax.jpeg")
 par(cex=1,mar=c(4,4,2,1),cex.lab=1,cex=1.5,font=2)
 correlation<-cor(Hafner_FIMM_GR_merged$LN_GR50.x,Hafner_FIMM_GR_merged$LN_GR50.y,method = "spearman")
-#ggplot(Hafner_FIMM_GR_merged,aes(x=LN_GR50.x,y=LN_GR50.y))+geom_point(color="slategray")+xlab("Hafner_GR50")+ylab("FIMM_GR50")+annotate(geom="text",label=paste("Spearman's correlation=",round(correlation,digits=4),sep=""),x=4,y=-15,color="black")
+#ggplot(Hafner_FIMM_GR_merged,aes(x=LN_GR50.x,y=LN_GR50.y))+ geom_point(color="slategray")+ xlab("Hafner_GR50")+ ylab("FIMM_GR50")+ annotate(geom="text",label=paste("Spearman's correlation=",round(correlation,digits=4),sep=""),x=4,y=-15,color="black")
 
-ggplot(Hafner_FIMM_GR_merged,aes(x=LN_GR50.x,y=LN_GR50.y))+geom_point(color="slategray")+geom_point(data=Cytostatic,color="yellow")+geom_point(data=GRmax_weak,color="red")+geom_point(data=Cytotoxic,color="green")+xlab("Hafner_GR50")+ylab("FIMM_GR50")+annotate(geom="text",label=paste("Spearman's correlation=",round(correlation,digits=4),sep=""),x=4,y=-13,color="black")+annotate(geom="text",label="Cytotoxic",x=-13,y=9,color="green")+annotate(geom="text",label="Cytostatic",x=-13,y=8,color="yellow")+annotate(geom="text",label="Weak GRmax",x=-13,y=7,color="red")
+ggplot(Hafner_FIMM_GR_merged,aes(x=LN_GR50.x,y=LN_GR50.y))+ geom_point(color="slategray")+geom_point(data=Cytostatic,color="yellow")+      geom_point(data=GRmax_weak,color="red")+ 
+ geom_point(data=Cytotoxic,color="green")+
+ xlab("Hafner_GR50")+ ylab("FIMM_GR50")+ 
+ annotate(geom="text",label=paste("Spearman's correlation=",round(correlation,digits=4),sep=""),x=4,y=-13,color="black")+
+  annotate(geom="text",label="Cytotoxic",x=-13,y=9,color="green")+
+  annotate(geom="text",label="Cytostatic",x=-13,y=8,color="yellow")+
+  annotate(geom="text",label="Weak GRmax",x=-13,y=7,color="red")
 #dev.off()
 ```
 
@@ -649,7 +683,7 @@ colnames(GDSC_orig_IC50_AUC)<-c("CellLine","Drug","GDSC_LNIC50","GDSC_AUC")
 Max_AUC<-max(Conventional_GR_allCalculatedMetrics_merged$AUC)
 Min_AUC<-min(Conventional_GR_allCalculatedMetrics_merged$AUC)
 Rescaled_AUC<-sapply(Conventional_GR_allCalculatedMetrics_merged$AUC, function(x) (x-Min_AUC)/(Max_AUC-Min_AUC))
-Conventional_GR_allCalculatedMetrics_merged<-cbind.data.frame(Conventional_GR_allCalculatedMetrics_merged,Rescaled_AUC)
+Conventional_GR_allCalculatedMetrics_merged <-                                                    cbind.data.frame(Conventional_GR_allCalculatedMetrics_merged,Rescaled_AUC)
 
 #Merge the IC50s/AUCs from GDSC and the values calculated using "drc" package
 GDSC_RecomputedIC50s_merged<-merge(Conventional_GR_allCalculatedMetrics_merged,GDSC_orig_IC50_AUC,by=c("CellLine","Drug"))
@@ -658,7 +692,7 @@ GDSC_RecomputedIC50s_merged<-merge(Conventional_GR_allCalculatedMetrics_merged,G
 #jpeg(filename="GDSC_Recomputed_IC50_correlation_plots.jpeg")
 par(cex=1,mar=c(4,4,2,1),cex.lab=1,cex=1.5,font=2)
 correlation<-cor(GDSC_RecomputedIC50s_merged$GDSC_LNIC50,GDSC_RecomputedIC50s_merged$LN_IC50,method = "spearman")
-ggplot(GDSC_RecomputedIC50s_merged,aes(x=GDSC_LNIC50,y=LN_IC50))+geom_point(color="slategray")+xlab("GDSC_IC50")+ylab("Recomputed_IC50")+annotate(geom="text",label=paste("Spearman's correlation=",round(correlation,digits=4),sep=""),x=8,y=-10,color="black")
+ggplot(GDSC_RecomputedIC50s_merged,aes(x=GDSC_LNIC50,y=LN_IC50))+geom_point(color="slategray")+xlab("GDSC_IC50")+ylab("Recomputed_IC50")+ annotate(geom="text",label=paste("Spearman's correlation=",round(correlation,digits=4),sep=""),x=8,y=-10,color="black")
 #dev.off()
 
 #Plot GDSC AUC vs Calculated AUCs
@@ -677,7 +711,7 @@ AllCor<-c()
 UniqueDrugs<-unique(as.vector(GDSC_RecomputedIC50s_merged$Drug))
 for(i in 1:length(UniqueDrugs))
 {
-  Drug_extract<-GDSC_RecomputedIC50s_merged[GDSC_RecomputedIC50s_merged$Drug==UniqueDrugs[i],]
+  Drug_extract<-GDSC_RecomputedIC50s_merged[ GDSC_RecomputedIC50s_merged$Drug==UniqueDrugs[ i ], ]
   Cor_drug_AUC<-cor(Drug_extract$Rescaled_AUC,Drug_extract$GDSC_AUC,method="spearman")
   Cor_drug_IC50<-cor(Drug_extract$LN_IC50,Drug_extract$GDSC_LNIC50,method="spearman")
   
@@ -685,16 +719,15 @@ for(i in 1:length(UniqueDrugs))
   Strong_narrowRange<-length(which(Drug_extract$Emax < 0.1))
   Weak_narrowRange<-length(which(Drug_extract$Emax >0.8))
   
-  cor_drug_merged<-cbind.data.frame(Drug=UniqueDrugs[i],Datapoints=nrow(Drug_extract),Corr_AUC=Cor_drug_AUC,Corr_IC50=Cor_drug_IC50,Strong_range=(Strong_narrowRange/nrow(Drug_extract))*100,Weak_range= (Weak_narrowRange/nrow(Drug_extract))*100)
+  cor_drug_merged <- cbind.data.frame(Drug=UniqueDrugs[ i ],Datapoints=nrow(Drug_extract),Corr_AUC=Cor_drug_AUC,Corr_IC50=Cor_drug_IC50, Strong_range = (Strong_narrowRange/nrow(Drug_extract))*100, Weak_range= (Weak_narrowRange/nrow(Drug_extract))*100)
   AllCor<-rbind.data.frame(AllCor,cor_drug_merged)
 }
 
-AllCor_complete<-AllCor[complete.cases(AllCor),]
-write.table(AllCor_complete,file="Drugwise_RescaledAUC_IC50_Origcorr.txt",sep="\t",row.names=FALSE,quote=FALSE)
+AllCor_complete<-AllCor[ complete.cases(AllCor), ]
 
 #Extract those drugs which are either too responsive or unreponsive to 90% of the cell lines 
 Narrow_Dist<-subset(AllCor_complete,(AllCor_complete$Strong_range>90 | AllCor_complete$Weak_range>90))
-Uniform_Dist<-AllCor_complete[!(AllCor_complete$Drug %in% Narrow_Dist$Drug),]
+Uniform_Dist<-AllCor_complete[ !(AllCor_complete$Drug %in% Narrow_Dist$Drug), ]
 
 #jpeg(filename="DrugwiseRescaledAUC_correlation_histograms_dist_sep.jpeg")
 hist(Uniform_Dist$Corr_AUC,breaks=10,xlim=c(0,1),ylim=c(0,100),col="deepskyblue",main='Drugwise AUC correlations',xlab='AUC correlation',ylab='#Drugs')
