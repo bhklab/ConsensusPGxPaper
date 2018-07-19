@@ -12,8 +12,9 @@ install.packages("AlternativeDrugResponseMetrics-master/AlternativeDrugResponseM
 ### Analysis
 Analysis folder includes 3 Rmd files.
 * GDSC_Calculate_AlternativeMetrics. Rmd - Preprocess GDSC data and calculate all the metrics
-* Figures.Rmd - Generate all the figures in the report
 * DrugResponsePredictions.Rmd - Generate drug response prediction models and make predictions on external test sets
+* Figures.Rmd - Generate all the figures in the report
+
 
 ### Figures in report
-Please check the Figures.pdf or Figures.html  in the Analysis subfolder of this repository.
+Please check Figures.pdf or Figures.html in the Analysis subfolder of this repository.
