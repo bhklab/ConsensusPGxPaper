@@ -1,0 +1,214 @@
+---
+title: "Alternative Metrics for GDSC"
+author: 
+- "Vigneshwari Subramanian"
+-  "Attila Gabor"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Alternative Metrics for GDSC}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+Rscript with functions to calculate GR and all associated metrics based on the approach described by Marc Hafner in \url{https://www.nature.com/articles/nbt.3882}
+
+
+```{r load_AlternativeDrugResponseMetrics}
+library(AlternativeDrugResponseMetrics)
+```
+Install and load a few packages required for this analysis
+
+```{r message = FALSE, warning = FALSE}
+if(!(require(c("drc","reshape2","VennDiagram"),character.only = TRUE))) {install.packages(c("drc","reshape2","VennDiagram"))}
+library("drc")
+library("reshape2")
+library("VennDiagram")
+```
+
+Data required: Raw data file with information about concentrations,raw intensities, positive and negative controls
+
+Data downloaded from \url{ftp://ftp.sanger.ac.uk/pub/project/cancerrxgene/releases/current_release/v17.3_public_raw_data.csv} and Drug names mapped based on Drug IDs 
+
+Read the raw data with the mapped drug names from the package. 
+you can check the format of the input file by ```??AllDrugs_CellLines_GDSC```
+
+```{r}
+data("AllDrugs_CellLines_GDSC",package = "AlternativeDrugResponseMetrics")
+GDSC_Data = as.data.frame(AllDrugs_CellLines_GDSC)
+```
+
+
+Compute the concetrations for each cellline - drug experiment:
+```{r, include=FALSE}
+GDSC_allvia = preprocess_GDSC(RawData = GDSC_Data,writeFile = T )
+head(GDSC_allvia)
+```
+
+
+Load the Division times and viabilities from Genentech screening data (GCSI) 
+```{r}
+data("Genentech_GCSI_Gemcitabine_Response",package = "AlternativeDrugResponseMetrics")
+Gemcitabine_GCSI_complete<-Genentech_GCSI_Gemcitabine_Response[complete.cases(Genentech_GCSI_Gemcitabine_Response),]
+
+data("Genentech_GCSI_DivisionTimes_CellLines")
+```
+
+
+Extract the Gemcitabine data corresponding to those cell lines for which the division rates are known.
+Make sure that the cell lines are in the same order in viabilities and divsion rates dataframes and  
+```{r}
+Cells_DivisionTimes_extract <- Genentech_GCSI_DivisionTimes_CellLines[ Genentech_GCSI_DivisionTimes_CellLines$CellLine %in% Gemcitabine_GCSI_complete$CellLine, ]
+Cells_DivisionTimes_extract_ordered <- Cells_DivisionTimes_extract[ order(Cells_DivisionTimes_extract$CellLine), ]
+Gemcitabine_DivisionTimes_known <- Gemcitabine_GCSI_complete[ Gemcitabine_GCSI_complete$CellLine %in% Genentech_GCSI_DivisionTimes_CellLines$CellLine, ]
+Gemcitabine_GCSI_complete_ordered<-Gemcitabine_DivisionTimes_known[order(Gemcitabine_DivisionTimes_known$CellLine),]
+Assay_Time <- 72
+```
+
+
+Calculate GR for Gemcitabine by using GCSI data
+Extract Gemcitabine measurements made at concentrations between 0.1 and 32 Mm for calculating interquartile means; Done to avoid using noisy data for calculating GRref/ICrefs from Gemcitabine   
+```{r}
+Gemcitabine_GCSI_GR <- GCSI_GR( Gemcitabine_GCSI_Via_Doses = Gemcitabine_GCSI_complete_ordered,
+								CellDivisionRates = Cells_DivisionTimes_extract_ordered,
+								Assay_Time = Assay_Time,
+								writeFile = T)
+Gemcitabine_GR_filtered <- Gemcitabine_GCSI_GR[ which( Gemcitabine_GCSI_GR$Conc >= 0.1 & Gemcitabine_GCSI_GR$Conc <= 32), ]
+Gemcitabine_GR_filtered_Lt32 <- Gemcitabine_GCSI_GR[ which(Gemcitabine_GCSI_GR$Conc <= 32), ]
+```
+
+Calculate Gemcitabine GRRef
+```{r}
+Gemcitabine_GCSI_InterquartileMean <- InterquartileMean(Gemcitabine_GR_filtered, type = "GCSI_GRRef", metric = "GR")
+```
+
+Calculate Gemcitabine ICRef
+```{r}
+GDSC_allvia_complete<-GDSC_allvia[complete.cases(GDSC_allvia),]
+
+#Drug id corresponding to Gemcitabione in GDSC : 135
+GDSC_Gemcitabine_extract<-GDSC_allvia_complete[GDSC_allvia_complete$Drug=="135",]
+Gemcitabine_conc_filt<-GDSC_Gemcitabine_extract[which(GDSC_Gemcitabine_extract$Conc>=0.1 & GDSC_Gemcitabine_extract$Conc<=32),]
+Gemcitabine_conc_filt_Lt32<-GDSC_Gemcitabine_extract[which(GDSC_Gemcitabine_extract$Conc<=32),]
+Gemcitabine_GDSC_InterquartileMean<-InterquartileMean(Gemcitabine_GR_filtered = Gemcitabine_conc_filt, type = "GDSC_ICRef", metric = "Rel_via")
+```
+
+Load the already published GR and conventional metrics for GCSI data and extract Gemcitabine data
+```{r}
+data("Genentech_GCSI_GR_published",package = "AlternativeDrugResponseMetrics")
+GCSI_Gemcitabine_published<-Genentech_GCSI_GR_published[Genentech_GCSI_GR_published$Perturbagen=="gemcitabine",]
+```
+
+
+Filter data to reduce noise and pick the cell lines for further analysis
+```{r warning=FALSE}
+Gemcitabine_R2_IC50_computed<-SigmoidFit_ComputeR2_IC50(Gemcitabine_conc_filt_Lt32)
+Gemcitabine_GR_var<-CellLines_var(Gemcitabine_GR_filtered,"GR")
+Gemcitabine_via_var<-CellLines_var(Gemcitabine_conc_filt,"Rel_via")
+GDSC_finalCellLines<-CellLines_filter(Gemcitabine_GCSI_InterquartileMean,Gemcitabine_GR_var,Gemcitabine_GDSC_InterquartileMean,Gemcitabine_via_var,Gemcitabine_R2_IC50_computed,GCSI_Gemcitabine_published)
+```
+
+
+
+
+Compute GR for GDSC
+```{r}
+GDSC_GR_all<-GDSC_GR(GDSC_finalCellLines = GDSC_finalCellLines,IGDSC_ref = Gemcitabine_GDSC_InterquartileMean, GR_GCSI_ref = Gemcitabine_GCSI_InterquartileMean, GDSC_via_complete = GDSC_allvia_complete,writeFile = T )
+```
+
+
+
+Fit sigmoid curves to compute all the associated metrics(It takes ~30 Minutes for computation)
+```{r warning=FALSE}
+Metrics_GR_headers=cbind.data.frame("CellLine","Drug","GR50","GEC50","GRmax","GR_inf","GR_HillCoeff","GRAOC","GR_R2","LN_GR50")
+GR_allMetrics<-AllMetrics_Calc(GDSC_GR_all,"GR",Metrics_GR_headers,writeFile=T,"Calculated_values/AllGDSC_ComputedGRMetrics_ConcCapped.txt")
+colnames(GR_allMetrics)<-c("CellLine","Drug","GR50","GEC50","GRmax","GR_inf","GR_HillCoeff","GRAOC","GR_R2","LN_GR50")
+IC_allMetrics<-ICMetrics_Calc(GDSC_GR_all,writeFile=T,"Calculated_values/AllGDSC_ComputedICMetrics_ConcCapped.txt")
+colnames(IC_allMetrics)<-c("CellLine","Drug","IC50","EC50","Emax","IC_inf","IC_HillCoeff","AUC","IC_R2","LN_IC50","AAC")
+```
+
+
+Combine conventional and GR metrics; Pick only those cell line and drug pairs that have both IC and GR metrics
+```{r}
+Conventional_GR_allCalculatedMetrics_merged<-merge(GR_allMetrics,IC_allMetrics,by = c("CellLine","Drug"))
+save(Conventional_GR_allCalculatedMetrics_merged, file = "Conventional_GR_allCalculatedMetrics_merged.rda")
+```
+
+Prepare the input files suitable for ANOVA analysis using GDSC tools (Conventional and GR metrics)
+```{r}
+data("COSMIC_ID_all",package = "AlternativeDrugResponseMetrics")
+data("GDSC_orig_IC50_AUC",package = "AlternativeDrugResponseMetrics")
+data("Conventional_GR_allCalculatedMetrics_merged",package="AlternativeDrugResponseMetrics")
+IC50_GDSCTools_format<-GDSCTools_Features_prep(Conventional_GR_allCalculatedMetrics_merged,COSMIC_ID_all,"LN_IC50","_GRset")
+AUC_GDSCTools_format<-GDSCTools_Features_prep(Conventional_GR_allCalculatedMetrics_merged,COSMIC_ID_all,"AUC","_GRset")
+AAC_GDSCTools_format<-GDSCTools_Features_prep(Conventional_GR_allCalculatedMetrics_merged,COSMIC_ID_all,"AAC","_GRset")
+GR50_GDSCTools_format<-GDSCTools_Features_prep(Conventional_GR_allCalculatedMetrics_merged,COSMIC_ID_all,"LN_GR50","_GRset")
+GRAOC_GDSCTools_format<-GDSCTools_Features_prep(Conventional_GR_allCalculatedMetrics_merged,COSMIC_ID_all,"GRAOC","_GRset")
+GRmax_GDSCTools_format<-GDSCTools_Features_prep(Conventional_GR_allCalculatedMetrics_merged,COSMIC_ID_all,"GRmax","_GRset")
+Emax_GDSCTools_format<-GDSCTools_Features_prep(Conventional_GR_allCalculatedMetrics_merged,COSMIC_ID_all,"Emax","_GRset")
+Orig_IC50_GDSCTools_format<-GDSCTools_Features_prep(GDSC_orig_IC50_AUC,COSMIC_ID_all,"LN_IC50","_GRset")
+Orig_AUC_GDSCTools_format<-GDSCTools_Features_prep(GDSC_orig_IC50_AUC,COSMIC_ID_all,"AUC","_GRset")
+```
+
+
+Calculate NDR, PI and GR metrics based on the approach described in Gupta et al., 2018; The dataset being large and all the metrics being computed at the same time, it takes quite a few hours for computation
+```{r}
+#Concentrations and relative viabilities calculated during the initial preprocessing step; Filter the raw data to pick those cell lines with division times
+data("AllDrugs_CellLines_GDSC",package = "AlternativeDrugResponseMetrics")
+data("Genentech_GCSI_DivisionTimes_CellLines",package = "AlternativeDrugResponseMetrics")
+GDSC_selective_data<-AllDrugs_CellLines_GDSC[AllDrugs_CellLines_GDSC$CellLine %in% Genentech_GCSI_DivisionTimes_CellLines$CellLine,]
+
+#Compute NDR, PI and other metrics
+RelVia_GR_NDR_PImetrics<-NDR_PI_GRmetrics(GDSC_selective_data,Genentech_GCSI_DivisionTimes_CellLines,writeFile=T)
+colnames(RelVia_GR_NDR_PImetrics)<-c("CellLine","Drug","Conc","Via","NDR","PI","GR")
+head(RelVia_GR_NDR_PImetrics)
+```
+
+Calculate all associated metrics for GR, PI and NDR data
+```{r, warning=FALSE}
+data(RelVia_GR_NDR_PImetrics)
+Metrics_GR_headers=cbind.data.frame("CellLine","Drug","GR50","GEC50","GRmax","GR_inf","GR_HillCoeff","GRAOC","GR_R2","LN_GR50")
+Metrics_NDR_headers=cbind.data.frame("CellLine","Drug","NDR50","NDR_EC50","NDRmax","NDR_inf","NDR_HillCoeff","NDR_AOC","NDR_R2","LN_NDR_50")
+Metrics_PI_headers=cbind.data.frame("CellLine","Drug","PI50","PI_EC50","PImax","PI_inf","PI_HillCoeff","PI_AOC","PI_R2","LN_PI_50")
+
+#Fit sigmoid curves to compute all related metrics
+GR_allMetrics_349CellLines<-AllMetrics_Calc(AllOtherMetrics,"GR",Metrics_GR_headers,writeFile=T,"Calculated_values/AllGDSC_ComputedGRMetrics_349CellLines_ConcCapped.txt")
+colnames(GR_allMetrics_349CellLines)<-c("CellLine","Drug","GR50","GEC50","GRmax","GR_inf","GR_HillCoeff","GRAOC","GR_R2","LN_GR50")
+NDR_allMetrics_349CellLines<-AllMetrics_Calc(AllOtherMetrics,"NDR",Metrics_NDR_headers,writeFile=T,"Calculated_values/AllGDSC_ComputedNDRMetrics_349CellLines_ConcCapped.txt")
+colnames(NDR_allMetrics_349CellLines)<-c("CellLine","Drug","NDR50","NDR_EC50","NDRmax","NDR_inf","NDR_HillCoeff","NDR_AOC","NDR_R2","LN_NDR_50")
+PI_allMetrics_349CellLines<-AllMetrics_Calc(AllOtherMetrics,"PI",Metrics_PI_headers,writeFile=T,"Calculated_values/AllGDSC_ComputedPIMetrics_349CellLines_ConcCapped.txt")
+colnames(PI_allMetrics_349CellLines)<-c("CellLine","Drug","PI50","PI_EC50","PImax","PI_inf","PI_HillCoeff","PI_AOC","PI_R2","LN_PI_50")
+IC_allMetrics_349CellLines<-ICMetrics_Calc(AllOtherMetrics,writeFile=T,"Calculated_values/AllGDSC_ComputedICMetrics_349CellLines_ConcCapped.txt")
+colnames(IC_allMetrics_349CellLines)<-c("CellLine","Drug","IC50","EC50","Emax","IC_inf","IC_HillCoeff","AUC","IC_R2","LN_IC50","AAC")
+```
+
+
+Combine conventional and other metrics; Pick only those cell line and drug pairs that have values for IC, GR, NDR and PI metrics
+```{r}
+library(plyr)
+l_NDRSet_files<-list(GR_allMetrics_349CellLines,NDR_allMetrics_349CellLines,PI_allMetrics_349CellLines,IC_allMetrics_349CellLines)
+AllMetrics_merged_NDRset<-join_all(l_NDRSet_files, type='inner', by = c("CellLine","Drug"))
+save(AllMetrics_merged_NDRset,file="AllMetrics_merged_NDRset.rda")
+```
+
+Prepare the input files suitable for ANOVA analysis using GDSC tools (Conventional,GR,NDR and PI metrics)
+```{r}
+data("COSMIC_ID_all",package = "AlternativeDrugResponseMetrics")
+data("AllMetrics_merged_NDRdata",package = "AlternativeDrugResponseMetrics")
+IC50_GDSCTools_format<-GDSCTools_Features_prep(AllMetrics_merged_NDRset,COSMIC_ID_all,"LN_IC50","_NDRset")
+AUC_GDSCTools_format<-GDSCTools_Features_prep(AllMetrics_merged_NDRset,COSMIC_ID_all,"AUC","_NDRset")
+AAC_GDSCTools_format<-GDSCTools_Features_prep(AllMetrics_merged_NDRset,COSMIC_ID_all,"AAC","_NDRset")
+GR50_GDSCTools_format<-GDSCTools_Features_prep(AllMetrics_merged_NDRset,COSMIC_ID_all,"LN_GR50","_NDRset")
+GRAOC_GDSCTools_format<-GDSCTools_Features_prep(AllMetrics_merged_NDRset,COSMIC_ID_all,"GRAOC","_NDRset")
+NDR50_GDSCTools_format<-GDSCTools_Features_prep(AllMetrics_merged_NDRset,COSMIC_ID_all,"LN_NDR_50","_NDRset")
+NDRAOC_GDSCTools_format<-GDSCTools_Features_prep(AllMetrics_merged_NDRset,COSMIC_ID_all,"NDR_AOC","_NDRset")
+PI50_GDSCTools_format<-GDSCTools_Features_prep(AllMetrics_merged_NDRset,COSMIC_ID_all,"LN_PI_50","_NDRset")
+PIAOC_GDSCTools_format<-GDSCTools_Features_prep(AllMetrics_merged_NDRset,COSMIC_ID_all,"PI_AOC","_NDRset")
+```
