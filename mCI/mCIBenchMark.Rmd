@@ -1,0 +1,155 @@
+---
+title: "mCIBenchMark"
+author: "Zhaleh Safikhani"
+date: '2018-07-16'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+\subsection{Downloading PharmacoSet objects}
+We have made the PharmacoSet objects of the curated datasets available for download using functions provided in the package. A table of available PharmacoSet objects can be obtained by using the *availablePSets* function. Any of the PharmacoSets in the table can then be downloaded by calling *downloadPSet*, which saves the datasets into a directory of the users choice, and returns the data into the R session. 
+```{r download_psets, eval=TRUE, results='hide'}
+library(PharmacoGx, verbose=FALSE)
+library(mCI, verbose=FALSE)
+library(Biobase, verbose=FALSE)
+availablePSets(saveDir=file.path(".", "mCI_BenchMark"))
+GDSC <- downloadPSet("GDSC", saveDir=file.path(".", "mCI_BenchMark")) 
+CCLE <- downloadPSet("CCLE", saveDir=file.path(".", "mCI_BenchMark"))
+  
+common <- intersectPSet(pSets = list("CCLE"=CCLE, "GDSC"=GDSC), 
+                        intersectOn = c("cell.lines", "drugs"), 
+                        strictIntersect = TRUE)
+drugs <- drugNames(common$CCLE)
+
+GDSC.aac <- summarizeSensitivityProfiles(
+    pSet=common$GDSC,
+    sensitivity.measure='auc_recomputed', 
+    summary.stat="median",
+    verbose=FALSE)
+CCLE.aac <- summarizeSensitivityProfiles(
+  pSet=common$CCLE,
+  sensitivity.measure='auc_recomputed', 
+  summary.stat="median",
+  verbose=FALSE)
+
+```
+
+\subsection{consistency assessment by Modified Concordance Index}
+To better assess the concordance of multiple pharmacogenomic studies we introduced the modified concordance index (mCI). Recognizing that the noise in the drug screening assays is high and may yield to inaccurate sensitive-based ranking of cell lines with close AAC values, the mCI only considers cell line pairs with drug sensitivity (AAC) difference greater than $\delta$ .
+
+```{r mci, eval=TRUE, results='hide'}
+
+c_index <-  mc_index <- NULL
+for(drug in drugs){
+  tt <- mCI::paired.concordance.index(GDSC.aac[drug,], CCLE.aac[drug,], delta.pred=0, delta.obs=0, alternative="greater", logic.operator="or")
+  c_index <- c(c_index, tt$cindex)
+  tt <- mCI::paired.concordance.index(GDSC.aac[drug,], CCLE.aac[drug,], delta.pred=0.2, delta.obs=0.2, alternative="greater", logic.operator="or")
+  mc_index <- c(mc_index, tt$cindex)
+}
+mp <- barplot(as.vector(rbind(c_index, mc_index)), beside=TRUE, col=c("blue", "red"), ylim=c(0, 1), ylab="concordance index", space=c(.15,.85), border=NA, main="mCI")
+text(mp, par("usr")[3], labels=as.vector(rbind(drugs, rep("", 15))), srt=45, adj=c(1.1,1.1), xpd=TRUE, cex=.8)
+abline(h=.7, lty=2)
+```
+
+\subsection{Known Biomarkers confirmation by Modified Concordance Index}
+As an example of the reproducibility of biomarker discovery across pharmacogenomic studies, we can model the significance of the association between two drugs and their known biomarkers in CCLE and GDSC. We examine the association between drug *17-AAG* and gene *NQO1*, as well as drug *PD-0325901* and gene *BRAF*:
+``` {r biomarker_discovery, results='hide'} 
+  library(survcomp, verbose=FALSE)
+  features <- PharmacoGx::fNames(CCLE, "rna")[
+    which(featureInfo(CCLE,
+                      "rna")$Symbol == "NQO1")]
+    sig.rna <- cbind("CCLE_mci"=unlist(paired.concordance.index(predictions=exprs(summarizeMolecularProfiles(pSet=CCLE, mDataType="rna", features=features))[features,],
+                                                                observations=summarizeSensitivityProfiles(pSet=CCLE, sensitivity.measure="auc_recomputed")["17-AAG", ],
+                                                                delta.pred=0, 
+                                                                delta.obs=0.2,
+                                                                alternative="greater",
+                                                                logic.operator="and")[c("cindex", "p.value", "relevant.pairs.no", "lower", "upper", "sterr")]),
+                      "CCLE_ci"=unlist(paired.concordance.index(predictions=exprs(summarizeMolecularProfiles(pSet=CCLE, mDataType="rna", features=features))[features,],
+                                                                observations=summarizeSensitivityProfiles(pSet=CCLE, sensitivity.measure="auc_recomputed")["17-AAG", ],
+                                                                delta.pred=0, 
+                                                                delta.obs=0,
+                                                                alternative="greater",
+                                                                logic.operator="and")[c("cindex", "p.value", "relevant.pairs.no", "lower", "upper", "sterr")]),
+                     "GDSC_mci"=unlist(paired.concordance.index(predictions=exprs(summarizeMolecularProfiles(pSet=GDSC, mDataType="rna", features=features))[features,],
+                                                                observations=summarizeSensitivityProfiles(pSet=GDSC, sensitivity.measure="auc_recomputed")["17-AAG", ],
+                                                                delta.pred=0, 
+                                                                delta.obs=0.2,
+                                                                alternative="greater",
+                                                                logic.operator="and")[c("cindex", "p.value", "relevant.pairs.no", "lower", "upper", "sterr")]),
+                      "GDSC_ci"=unlist(paired.concordance.index(predictions=exprs(summarizeMolecularProfiles(pSet=GDSC, mDataType="rna", features=features))[features,],
+                                                                observations=summarizeSensitivityProfiles(pSet=GDSC, sensitivity.measure="auc_recomputed")["17-AAG", ],
+                                                                delta.pred=0, 
+                                                                delta.obs=0,
+                                                                alternative="greater",
+                                                                logic.operator="and")[c("cindex", "p.value", "relevant.pairs.no", "lower", "upper", "sterr")]))
+      alpha <- 0.05
+      meta_mci <- survcomp::combine.est(x=sig.rna["cindex", grep("mci", colnames(sig.rna))], x.se=sig.rna["sterr", grep("mci", colnames(sig.rna))], na.rm=TRUE)
+      meta_mci_pvalue <- survcomp::combine.test(p=sig.rna["p.value", grep("mci", colnames(sig.rna))], method="z.transform")
+      meta_mci_ci <- qnorm(p=alpha/2, lower.tail=FALSE) * meta_mci$se
+
+      meta_ci <- survcomp::combine.est(x=sig.rna["cindex", grep("_ci", colnames(sig.rna))], x.se=sig.rna["sterr", grep("_ci", colnames(sig.rna))], na.rm=TRUE)
+      meta_ci_pvalue <- survcomp::combine.test(p=sig.rna["p.value", grep("_ci", colnames(sig.rna))], method="z.transform")
+      meta_ci_ci <- qnorm(p=alpha/2, lower.tail=FALSE) * meta_mci$se
+      
+      r.mean <- rbind(cbind(sig.rna["cindex", grep("_ci", colnames(sig.rna))], 
+                            sig.rna["cindex", grep("mci", colnames(sig.rna))]), 
+                      c(meta_ci$estimate,
+                      meta_mci$estimate))
+      r.lower <- rbind(cbind(sig.rna["lower", grep("_ci", colnames(sig.rna))], 
+                            sig.rna["lower", grep("mci", colnames(sig.rna))]), 
+                      c(meta_ci$estimate - meta_ci_ci,
+                      meta_mci$estimate - meta_mci_ci))
+      
+      r.upper <- rbind(cbind(sig.rna["upper", grep("_ci", colnames(sig.rna))], 
+                            sig.rna["upper", grep("mci", colnames(sig.rna))]), 
+                      c(meta_ci$estimate + meta_ci_ci,
+                      meta_mci$estimate + meta_mci_ci))
+      r.pval <-  rbind(cbind(sprintf("%.1E", sig.rna["p.value", grep("_ci", colnames(sig.rna))]), 
+                           sprintf("%.1E", sig.rna["p.value", grep("mci", colnames(sig.rna))])),
+                       c(sprintf("%.1E", meta_ci_pvalue),
+                         sprintf("%.1E", meta_mci_pvalue)))
+    
+      rownames(r.mean) <- rownames(r.lower) <- rownames(r.upper) <- rownames(r.pval) <- c("CCLE", "GDSC", "Meta analysis")
+      colnames(r.mean) <- colnames(r.lower) <- colnames(r.upper) <- colnames(r.pval) <- c("CI (p)", "mCI (p)")
+
+      library(forestplot)
+      row_names <- cbind(rownames(r.pval), r.pval)
+      row_names <- rbind(c("Dataset", colnames(r.pval)), row_names)
+      r.mean <- rbind(NA, r.mean)
+      r.lower <- rbind(NA, r.lower)
+      r.upper <- rbind(NA, r.upper)
+    
+      forestplot(row_names,
+                 r.mean, r.lower, r.upper,
+                 is.summary=c(rep(FALSE, 3), TRUE),
+                 title="17-AAG, NQO1: expression",
+                 zero=c(.49, .51),
+                 #grid = structure(c(2^-.5, 2^.5), gp = gpar(col = "steelblue", lty=2)),
+                 #boxsize=0.35,
+                 hrzl_lines=list("2"=gpar(lty=2, columns=1:3, col = "#000044")),
+                 txt_gp=fpTxtGp(label=gpar(fontfamily = "", cex = 0.8, fontface=2),
+                                  ticks=gpar(fontfamily = "", cex=.5, fontface=1),
+                                  xlab=gpar(fontfamily = "", cex=1.2, fontface=2),
+                                  legend=gpar(fontfamily = "", cex = 1, fontface=1)),
+                 col=fpColors(box=RColorBrewer::brewer.pal(n=4, name="Set2"),
+                              line=RColorBrewer::brewer.pal(n=4, name="Set2"),
+                              summary=RColorBrewer::brewer.pal(n=4, name="Set2")),
+                 xlab="Concordance Index",
+                 xticks= c(.3, .4, .5, .6, .7, .8, .9),
+                 new_page = F,
+                 legend=colnames(r.mean),
+                 legend_args = fpLegend(pos = list("topright"),
+                                        title="Subtype",
+                                        r = unit(.1, "snpc"),
+                                        gp = gpar(col="#CCCCCC", lwd=1.5)))
+```
